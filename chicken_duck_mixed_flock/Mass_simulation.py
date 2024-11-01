@@ -11,6 +11,7 @@ num_simu = 500 # number of total simulations
 tot_chicken_popul = 3000 # <---- set total chicken population
 tot_duck_popul = 300 # <---- set total duck population
 surveillance = 30 # <---- choose how many chickens to be under surveillance
+testing_periods = [7, 14, 30] # <---- set the period of testing for surveillance
 
 # initialise the infection rate tensor
 beta_S = np.zeros((num_flocks, num_species, num_flocks, num_species))
@@ -50,7 +51,7 @@ init_val = np.zeros((num_flocks, num_species, 6)) # Six possible compartment: S,
 init_val[0,0,0] += tot_chicken_popul
 init_val[0,1,0] += tot_duck_popul
 init_val[0,0,0] -= surveillance
-init_val[1,0,0] += surveillance # chicken under surveillance moved to 'flock' 1
+init_val[1,0,0] += surveillance # chicken under surveillance moved to 'flock 1'
 
 # store the total population for each flock and each species
 tot_popul = init_val[:,:,0].copy()
@@ -223,6 +224,29 @@ def final_size_end_time(t, y):
     final_size = np.sum(y[-1,:,:,-1], axis=1)
     end_time = t[-1]
     return final_size, end_time
+
+######## Obtain time of surveillance outcomes ########
+
+def surveillance_outcomes(t, y, testing_periods):
+    detection_times = np.zeros(len(testing_periods))
+    count = 0
+    for testing_period in testing_periods:
+        testing_time = np.array(range(0, int(max(t)), testing_period))
+        testing_index = np.zeros(len(testing_time))
+
+        for test in range(len(testing_time)):
+            i = np.searchsorted(t, testing_time[test], side='right') - 1
+            testing_index[test] = i
+
+        # Obtain the result of all testing:
+        testing_result = [y[int(i), 1, 0, 3] for i in testing_index] # test int(i), flock 1, chicken, I_S
+        detection_time = next((testing_time[i] for i, x in enumerate(testing_result) if x > 3), None)
+
+        detection_times[count] = detection_time
+        count += 1
+
+    return detection_times     
+
 
 ######## Collect all statistics for a number of simulations ########
 def mass_simu(num_simu, max_events=max_events, init_val=init_val, tot_popul=tot_popul, 
