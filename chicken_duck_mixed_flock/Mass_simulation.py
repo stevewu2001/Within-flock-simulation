@@ -1,12 +1,12 @@
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import pandas as pd
 
 ######## Changable Values ########
 num_flocks = 1 + 1 # +1 chicken surveillence - technically still one flock, add one to make tracking easier. Need to reflect in beta, sigma, and gamma 
 num_species = 2 # chicken and duck - chicken is species 0, duck is species 1.
 
-num_simu = 500 # number of total simulations
+num_simu = 10 # number of total simulations
 
 tot_chicken_popul = 3000 # <---- set total chicken population
 tot_duck_popul = 300 # <---- set total duck population
@@ -255,12 +255,21 @@ def mass_simu(num_simu, max_events=max_events, init_val=init_val, tot_popul=tot_
                     num_species=num_species):
     t_mass_simu = []
     y_mass_simu = []
-    for iters in range(num_simu):
-        t, y = Gillespie_simu(max_events, init_val, tot_popul, 
-                              beta_S, beta_A, sigma_S, sigma_A, gamma_S, 
-                              gamma_A, p_S, p_A, num_flocks, num_species)
+    # for iters in range(num_simu):
+    #     t, y = Gillespie_simu(max_events, init_val, tot_popul, 
+    #                           beta_S, beta_A, sigma_S, sigma_A, gamma_S, 
+    #                           gamma_A, p_S, p_A, num_flocks, num_species)
+    #################################################
+    param = max_events, init_val, tot_popul, beta_S, beta_A, sigma_S, sigma_A, gamma_S, gamma_A, p_S, p_A, num_flocks, num_species
+    result = list(map(lambda p: Gillespie_simu(*p), [param]*num_simu))
+
+    for t_and_y in result:
+        t,y = t_and_y
         t_mass_simu.append(t)
         y_mass_simu.append(y)
+    #################################################
+        # t_mass_simu.append(t)
+        # y_mass_simu.append(y)
     return t_mass_simu, y_mass_simu
 
 def mass_outbreak_statistics(t_mass_simu, y_mass_simu, outbreak_threshold=5):
