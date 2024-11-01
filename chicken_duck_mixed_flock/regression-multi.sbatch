@@ -9,6 +9,8 @@
 #SBATCH --output=regression-multi.out
 #SBATCH --error=regression-multi.err
 
+# We try something new
+
 # Tell numpy, scipy etc. how many cpus are available
 MY_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export OMP_NUM_THREADS=$MY_NUM_THREADS
