@@ -307,7 +307,7 @@ mass_final_size, mass_end_time = mass_final_size_end_time(t_mass_simu, y_mass_si
 df = pd.DataFrame({'Outbreak': mass_outbreak,
                     'Outbreak Time': mass_outbreak_time,
                     'Outbreak Chicken': mass_outbreak_indiv[:,0],
-                    'Outbreak Duck': mass_outbreak_indiv[:,1], 
+                    'Outbreak Duck': mass_outbreak_indiv[:,2], 
                     'Outbreak Time Chicken': mass_outbreak_time_indiv[:,0], 
                     'Outbreak Time Duck': mass_outbreak_time_indiv[:,1], 
                     'Peak Size Whole': mass_peak_size_whole, 
