@@ -376,3 +376,4 @@ df = pd.DataFrame({'Outbreak': mass_outbreak,
                    'Detection Time Random': mass_detection_time_random})
 
 df.to_csv('Results.csv', index=False)
+
