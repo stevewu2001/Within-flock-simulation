@@ -1,48 +1,63 @@
 import numpy as np
 import pandas as pd
 
+num_simu = 10
+
 ######## Changable Values ########
 # set number of species and flocks
 num_flocks = 1 # One single flock, need to reflect in beta, sigma, and gamma 
-num_species = 3 # chicken, sentinel chicken, duck - chicken is species 0, duck is species 1.
+num_species = 4 # chicken, sentinel chicken, vaccinated chicken, duck
 
-num_simu = 50 # number of total simulations
-
-tot_chicken_popul = 3000 # <---- set total chicken population
+tot_chicken_popul = 3000 # total chicken population
 tot_duck_popul = 300 # <---- set total duck population
-surveillance = 30 # <---- choose how many chickens to be under surveillance
-testing_periods = [7, 14, 30] # <---- set the period of testing for surveillance
+surveillance = 30 # how many chickens to be under surveillance
+vaccinated = 1000 # <---- choose how many chickens to be vaccinated
+
+######## Changable Values ########
+# Here we may adjust the key parameters for the simulation
+same_species_symptomatic_infection_rate = 1.13
+same_species_asymptomatic_infection_rate = 1.07
+different_species_symptomatic_infection_rate = 0.3
+different_species_asymptomatic_infection_rate = 0.25
+
+symptomatic_latency_period = 1
+asymptomatic_latency_period = 1
+
+symptomatic_infectious_period = 3.2
+asymptomatic_infectious_period = 4.9
+
+chicken_symptomatic_prob = 0.95
+duck_symptomatic_prob = 0.05
 
 # initialise the infection rate tensor
 beta_S = np.zeros((num_flocks, num_species, num_flocks, num_species))
 
-beta_S[:, :2, :, :2] = 0.47 # within-chicken infection
-beta_S[:, :2, :, 2] = 0.3 # chicken-to-duck infection
-beta_S[:, 2, :, :2] = 1.5 # duck-to-chicken infection
-beta_S[:, 2, :, 2] = 1.5 # within-duck infection
+beta_S[:, :2, :, :2] = same_species_symptomatic_infection_rate # within-chicken infection
+beta_S[:, :2, :, 3] = different_species_symptomatic_infection_rate # chicken-to-duck infection
+beta_S[:, 3, :, :2] = different_species_asymptomatic_infection_rate # duck-to-chicken infection
+beta_S[:, 3, :, 3] = same_species_symptomatic_infection_rate # within-duck infection
 
 beta_A = np.zeros((num_flocks, num_species, num_flocks, num_species))
 
-beta_A[:, :2, :, :2] = 0.01 # within-chicken infection
-beta_A[:, :2, :, 2] = 0.01 # chicken-to-duck infection
-beta_A[:, 2, :, :2] = 1 # duck-to-chicken infection
-beta_A[:, :2, :, :2] = 1 # within-duck infection
+beta_A[:, :2, :, :2] = same_species_asymptomatic_infection_rate # within-chicken infection
+beta_A[:, :2, :, 3] = different_species_asymptomatic_infection_rate # chicken-to-duck infection
+beta_A[:, 3, :, :2] = different_species_asymptomatic_infection_rate # duck-to-chicken infection
+beta_A[:, 3, :, 3] = same_species_asymptomatic_infection_rate # within-duck infection
 
-# latency and infectious period, can be changed
-latency_period_S = 1 * np.ones(num_species)
+# latency and infectious period
+latency_period_S = np.ones(num_species) * symptomatic_latency_period
 sigma_S = np.ones(num_species) / latency_period_S
-latency_period_A = 0.5 * np.ones(num_species)
+latency_period_A = np.ones(num_species) * asymptomatic_latency_period
 sigma_A = np.ones(num_species) / latency_period_A
 
-infectious_period_S = 3.2 * np.ones(num_species)
+infectious_period_S = np.ones(num_species) * symptomatic_infectious_period
 gamma_S = np.ones(num_species) / infectious_period_S
-infectious_period_A = 1.9 * np.ones(num_species)
+infectious_period_A = np.ones(num_species) * asymptomatic_infectious_period
 gamma_A = np.ones(num_species) / infectious_period_A
 
-# probability of displaying symptoms, can be changed
-p_S = np.array([0.95, 0.95, 0.05])
+# probability of displaying symptoms
+p_S = np.array([chicken_symptomatic_prob, chicken_symptomatic_prob, 0, duck_symptomatic_prob])
 p_A = np.ones(num_species) - p_S
-
 
 
 ######## set initial conditions ######## 
@@ -53,38 +68,55 @@ p_A = np.ones(num_species) - p_S
 init_val = np.zeros((num_flocks, num_species, 6)) # Six possible compartment: S, E_S, E_A, I_S, I_A, R
 
 # first let all birds to start susceptible, also choose population size here.
-init_val[0,0,0] += 3000 # <---- set total chicken population
-init_val[0,2,0] += 300 # <---- set total duck population
-
-surveillance = 30 # <---- choose how many chickens to be under surveillance
+init_val[0,0,0] += tot_chicken_popul # <---- set total chicken population
+init_val[0,3,0] += tot_duck_popul # <---- set total duck population
 
 init_val[0,0,0] -= surveillance
-init_val[0,1,0] += surveillance # chicken under surveillance moved to 'flock' 1
+init_val[0,1,0] += surveillance # chicken under surveillance 
+
+init_val[0,0,0] -= vaccinated
+init_val[0,2,0] += vaccinated # vaccinated chicken
 
 
 # store the total population for each flock and each species
 tot_popul = init_val[:,:,0].copy()
 
-# then choose a bird to be exposed (symptomatic), here we assume it to be the duck
-init_val[0,2,0] -= 1
-init_val[0,2,1] += 1
+# then choose a bird to be exposed (symptomatic), here we assume it to be a chicken
+init_val[0,0,0] -= 1
+init_val[0,0,1] += 1
 
 
 # this is the maximum number of events that would occur, typically the number will not be reached, but 
 # for diseases that does not die out this is necessary to not fall into an infinite while loop.
 max_events = 500000
 
+
 ######## Define update rules to be used in the Gillespie Algorithm ########
 
-def S_to_E(a, b, current_val, symptomatic=True, tot_popul=tot_popul, beta_S=beta_S, beta_A=beta_A, p_S=p_S, p_A=p_A, num_flocks=num_flocks, num_species=num_species):
-    infection_rate = (beta_S[:, :, a, b] * current_val[:, :, 3] + beta_A[:, :, a, b] * current_val[:, :, 4]) / np.where(tot_popul != 0, tot_popul, 1)
-    val = np.sum(infection_rate)
-    
+# def S_to_E(a, b, current_val, symptomatic = True, tot_popul=tot_popul, beta_S=beta_S, beta_A=beta_A, p_S=p_S, p_A=p_A, num_flocks=num_flocks, num_species=num_species):
+#     val = 0
+#     for i in range(num_flocks):
+#         for j in range(num_species):
+#             if tot_popul[i,j] != 0:
+#                 val += (beta_S[i,j,a,b] * current_val[i,j,3] + beta_A[i,j,a,b] * current_val[i,j,4]) / tot_popul[i,j]
+#     if symptomatic:
+#         val = val * current_val[a,b,0] * p_S[b]
+#     else:
+#         val = val * current_val[a,b,0] * p_A[b]
+#     return val
+
+
+
+def S_to_E(a, b, current_val, symptomatic = True, tot_popul=tot_popul, beta_S=beta_S, beta_A=beta_A, p_S=p_S, p_A=p_A, num_flocks=num_flocks, num_species=num_species):
+    val = 0
+    for i in range(num_flocks):
+        for j in range(num_species):
+            if tot_popul[i,j] != 0:
+                val += (beta_S[i,j,a,b] * current_val[i,j,3] + beta_A[i,j,a,b] * current_val[i,j,4]) / np.sum(tot_popul[i,:])
     if symptomatic:
-        val *= current_val[a, b, 0] * p_S[b]
+        val = val * current_val[a,b,0] * p_S[b]
     else:
-        val *= current_val[a, b, 0] * p_A[b]
-    
+        val = val * current_val[a,b,0] * p_A[b]
     return val
 
 def E_to_I(a, b, current_val, symptomatic = True, tot_popul=tot_popul, sigma_S=sigma_S, sigma_A=sigma_A, num_flocks=num_flocks, num_species=num_species):
@@ -125,7 +157,6 @@ def Gillespie_simu(max_events=max_events, init_val=init_val, tot_popul=tot_popul
 
         all_events = np.zeros((num_flocks, num_species, 6)) # six types of update rules in total
 
-        all_events = np.zeros((num_flocks, num_species, 6)) # six types of update rules in total
         all_events[:, :, 0] = S_to_E(np.arange(num_flocks)[:, None], np.arange(num_species), current_val, True)
         all_events[:, :, 1] = S_to_E(np.arange(num_flocks)[:, None], np.arange(num_species), current_val, False)
         all_events[:, :, 2] = E_to_I(np.arange(num_flocks)[:, None], np.arange(num_species), current_val, True)
@@ -200,6 +231,7 @@ def Gillespie_simu(max_events=max_events, init_val=init_val, tot_popul=tot_popul
 
     return t, y
 
+
 ######## Outbreak statistics ########
 def outbreak_statistics(t, y, outbreak_threshold = 5):
     # Outbreak or not
@@ -230,31 +262,9 @@ def peak_size(t, y):
 ######## Final size and end time ########
 def final_size_end_time(t, y):
     ######## Final size ########
-    final_size = np.sum(y[-1,:,:,-1], axis=1)
+    final_size = np.sum(y[-1,:,:,-1], axis=0)
     end_time = t[-1]
     return final_size, end_time
-
-######## Obtain time of surveillance outcomes ########
-
-def surveillance_outcomes(t, y, testing_periods):
-    detection_times = np.zeros(len(testing_periods))
-    count = 0
-    for testing_period in testing_periods:
-        testing_time = np.array(range(0, int(max(t)), testing_period))
-        testing_index = np.zeros(len(testing_time))
-
-        for test in range(len(testing_time)):
-            i = np.searchsorted(t, testing_time[test], side='right') - 1
-            testing_index[test] = i
-
-        # Obtain the result of all testing:
-        testing_result = [y[int(i), 1, 0, 3] for i in testing_index] # test int(i), flock 1, chicken, I_S
-        detection_time = next((testing_time[i] for i, x in enumerate(testing_result) if x > 3), None)
-
-        detection_times[count] = detection_time
-        count += 1
-
-    return detection_times     
 
 
 ######## Collect all statistics for a number of simulations ########
@@ -305,19 +315,19 @@ mass_final_size, mass_end_time = mass_final_size_end_time(t_mass_simu, y_mass_si
 
 ######## Create a csv file to store the results ########
 df = pd.DataFrame({'Outbreak': mass_outbreak,
-                    'Outbreak Time': mass_outbreak_time,
-                    'Outbreak Chicken': mass_outbreak_indiv[:,0],
-                    'Outbreak Duck': mass_outbreak_indiv[:,2], 
-                    'Outbreak Time Chicken': mass_outbreak_time_indiv[:,0], 
-                    'Outbreak Time Duck': mass_outbreak_time_indiv[:,1], 
-                    'Peak Size Whole': mass_peak_size_whole, 
-                    'Peak Time Whole': mass_peak_time_whole, 
-                    'Peak Size Chicken': mass_peak_size_indiv[:,0], 
-                    'Peak Time Chicken': mass_peak_time_indiv[:,0], 
-                    'Peak Size Duck': mass_peak_size_indiv[:,1], 
-                    'Peak Time Duck': mass_peak_time_indiv[:,1], 
-                    'Final Size Chicken': mass_final_size[:,0], 
-                    'Final Size Duck': mass_final_size[:,1], 
-                    'End Time': mass_end_time})
+                   'Outbreak Time': mass_outbreak_time,
+                   'Outbreak Chicken': mass_outbreak_indiv[:, 0],
+                   'Outbreak Duck': mass_outbreak_indiv[:, 3], 
+                   'Outbreak Time Chicken': mass_outbreak_time_indiv[:, 0], 
+                   'Outbreak Time Duck': mass_outbreak_time_indiv[:, 3], 
+                   'Peak Size Whole': mass_peak_size_whole, 
+                   'Peak Time Whole': mass_peak_time_whole, 
+                   'Peak Size Chicken': np.sum(mass_peak_size_indiv[:, :3], axis=1), 
+                   'Peak Time Chicken': np.sum(mass_peak_time_indiv[:, :3], axis=1), 
+                   'Peak Size Duck': mass_peak_size_indiv[:, 3], 
+                   'Peak Time Duck': mass_peak_time_indiv[:, 3], 
+                   'Final Size Chicken': np.sum(mass_final_size[:, :3], axis=1), 
+                   'Final Size Duck': mass_final_size[:, 3], 
+                   'End Time': mass_end_time})
 
 df.to_csv('Results.csv', index=False)
