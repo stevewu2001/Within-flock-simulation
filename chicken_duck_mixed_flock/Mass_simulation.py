@@ -18,7 +18,7 @@ testing_period = 7 # how many days to test the sentinel birds / do random testin
 
 ######## Changable Values ########
 # Here we may adjust the key parameters for the simulation
-same_species_symptomatic_infection_rate = 1.13
+same_species_symptomatic_infection_rate = 1.13 
 same_species_asymptomatic_infection_rate = 1.07
 different_species_symptomatic_infection_rate = 0.3 # vary between [0.3, 0.6, 1.13]
 different_species_asymptomatic_infection_rate = 0.25 # vary between [0.25, 0.5, 1.07]
