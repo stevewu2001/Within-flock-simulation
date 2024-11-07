@@ -9,8 +9,8 @@ num_flocks = 1 # One single flock, need to reflect in beta, sigma, and gamma
 num_species = 4 # chicken, sentinel chicken, vaccinated chicken, duck
 
 tot_chicken_popul = 3000 # total chicken population
-tot_duck_popul = 3000 # <---- set total duck population
-vaccinated = 0 # <---- choose how many chickens to be vaccinated
+tot_duck_popul = 3000 # <---- set total duck population (vary between [300, 1500, 3000, 5000])
+vaccinated = 0 # <---- choose how many chickens to be vaccinated (vary between [0, 1500, 2250, 2700])
 
 ######## Surveillance Strategy ########
 surveillance = 30 # how many chickens are sentinel birds / how many chickens to randomly sample
@@ -20,8 +20,8 @@ testing_period = 7 # how many days to test the sentinel birds / do random testin
 # Here we may adjust the key parameters for the simulation
 same_species_symptomatic_infection_rate = 1.13
 same_species_asymptomatic_infection_rate = 1.07
-different_species_symptomatic_infection_rate = 0.3
-different_species_asymptomatic_infection_rate = 0.25
+different_species_symptomatic_infection_rate = 0.3 # vary between [0.3, 0.6, 1.13]
+different_species_asymptomatic_infection_rate = 0.25 # vary between [0.25, 0.5, 1.07]
 
 chicken_symptomatic_latency_period = 1
 duck_symptomatic_latency_period = 1
@@ -262,7 +262,7 @@ def final_size_end_time(t, y):
 
 ######## Obtain time of surveillance outcomes ########
 
-def sentinel_outcomes(t, y, testing_period=testing_period):
+def sentinel_outcomes(t, y, testing_period=testing_period, detection_threshold=1):
 
     testing_time = np.array(range(0, int(max(t)), testing_period))
     testing_index = np.zeros(len(testing_time))
@@ -272,12 +272,12 @@ def sentinel_outcomes(t, y, testing_period=testing_period):
         testing_index[test] = i
 
     # Obtain the result of all testing:
-    testing_result = [y[int(i), 0, 1, 3] for i in testing_index] # test int(i), flock 0, sentinel chicken, I_S
-    detection_time = next((testing_time[i] for i, x in enumerate(testing_result) if x >= 1), None)
+    testing_result = [np.sum(y[int(i), 0, 1, 3:5]) for i in testing_index] # test int(i), flock 0, sentinel chicken, I
+    detection_time = next((testing_time[i] for i, x in enumerate(testing_result) if x >= detection_threshold), None)
 
     return detection_time   
 
-def random_sample_outcomes(t, y, surveillance=surveillance, testing_period=testing_period):
+def random_sample_outcomes(t, y, surveillance=surveillance, testing_period=testing_period, detection_threshold=1):
 
     testing_time = np.array(range(0, int(max(t)), testing_period))
     testing_index = np.zeros(len(testing_time))
@@ -287,8 +287,8 @@ def random_sample_outcomes(t, y, surveillance=surveillance, testing_period=testi
         testing_index[test] = i
 
     # Obtain the result of all testing:
-    testing_result = [np.random.uniform() < np.sum(y[int(i), 0, 0:2, 3]) / np.sum(y[int(i), 0, 0:3, :]) for i in testing_index] # test int(i), flock 1, chicken, I_S
-    detection_time = next((testing_time[i] for i, x in enumerate(testing_result) if x >= 1), None)
+    testing_result = [np.random.binomial(surveillance, np.sum(y[int(i), 0, 0:2, 3:5]) / np.sum(y[int(i), 0, 0:3, :])) for i in testing_index] # a binomial draw based on the proportion of infected birds
+    detection_time = next((testing_time[i] for i, x in enumerate(testing_result) if x >= detection_threshold), None)
 
     return detection_time
 
@@ -375,5 +375,6 @@ df = pd.DataFrame({'Outbreak': mass_outbreak,
                    'Detection Time Sentinel': mass_detection_time_sentinel,
                    'Detection Time Random': mass_detection_time_random})
 
-df.to_csv('Results.csv', index=False)
+
+df.to_csv(f'Results_vaccinated_{vaccinated}_ducks_{tot_duck_popul}_dssi_{different_species_symptomatic_infection_rate}_dsai_{different_species_asymptomatic_infection_rate}.csv', index=False)
 
