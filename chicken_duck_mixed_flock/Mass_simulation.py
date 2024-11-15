@@ -3,6 +3,7 @@ import pandas as pd
 
 num_simu = 10 # number of total simulations, smaller number for testing, larger number for data generation.
 
+
 ######## Changable Values ########
 # set number of species and flocks
 num_flocks = 1 # One single flock, need to reflect in beta, sigma, and gamma 
@@ -16,8 +17,7 @@ vaccinated = 0 # <---- choose how many chickens to be vaccinated (vary between [
 surveillance = 30 # how many chickens are sentinel birds / how many chickens to randomly sample
 testing_period = 7 # how many days to test the sentinel birds / do random testing.
 
-######## Changable Values ########
-# Here we may adjust the key parameters for the simulation
+####### Here we may adjust the key parameters for the simulation ########
 same_species_symptomatic_infection_rate = 1.13 
 same_species_asymptomatic_infection_rate = 1.07
 different_species_symptomatic_infection_rate = 0.3 # vary between [0.3, 0.6, 1.13]
@@ -35,6 +35,10 @@ duck_asymptomatic_infectious_period = 4.9
 
 chicken_symptomatic_prob = 0.95
 duck_symptomatic_prob = 0.05
+
+
+#####################################################################
+#####################################################################
 
 # initialise the infection rate tensor
 beta_S = np.zeros((num_flocks, num_species, num_flocks, num_species))
@@ -99,29 +103,26 @@ max_events = 500000
 
 ######## Define update rules to be used in the Gillespie Algorithm ########
 
-def S_to_E(a, b, current_val, symptomatic = True, tot_popul=tot_popul, beta_S=beta_S, beta_A=beta_A, p_S=p_S, p_A=p_A, num_flocks=num_flocks, num_species=num_species):
-    val = 0
-    for i in range(num_flocks):
-        for j in range(num_species):
-            val += (beta_S[i,j,a,b] * current_val[i,j,3] + beta_A[i,j,a,b] * current_val[i,j,4]) / np.sum(tot_popul[i,:])
-
+def S_to_E(current_val, symptomatic = True, tot_popul=tot_popul, beta_S=beta_S, beta_A=beta_A, p_S=p_S, p_A=p_A, num_flocks=num_flocks, num_species=num_species):
+    output_matrix = np.sum(np.sum(beta_S * current_val[:,:,3].reshape(num_flocks, num_species, 1, 1) + beta_A * current_val[:,:,4].reshape(num_flocks, num_species, 1, 1), axis=1), axis=1) / np.sum(tot_popul, axis=1).reshape(num_flocks, 1)
     if symptomatic:
-        val = val * current_val[a,b,0] * p_S[b]
+        return output_matrix * current_val[:,:,0] * p_S
     else:
-        val = val * current_val[a,b,0] * p_A[b]
-    return val
+        return output_matrix * current_val[:,:,0] * p_A
 
-def E_to_I(a, b, current_val, symptomatic = True, tot_popul=tot_popul, sigma_S=sigma_S, sigma_A=sigma_A, num_flocks=num_flocks, num_species=num_species):
-    if symptomatic:
-        return current_val[a,b,1] * sigma_S[b]
-    else:
-        return current_val[a,b,2] * sigma_A[b]
 
-def I_to_R(a, b, current_val, symptomatic = True, tot_popul=tot_popul, gamma_S=gamma_S, gamma_A=gamma_A, num_flocks=num_flocks, num_species=num_species):
+def E_to_I(current_val, symptomatic = True, tot_popul=tot_popul, sigma_S=sigma_S, sigma_A=sigma_A, num_flocks=num_flocks, num_species=num_species):
     if symptomatic:
-        return current_val[a,b,3] * gamma_S[b]
+        return current_val[:,:,1] * sigma_S
     else:
-        return current_val[a,b,4] * gamma_A[b]
+        return current_val[:,:,2] * sigma_A
+
+
+def I_to_R(current_val, symptomatic = True, tot_popul=tot_popul, gamma_S=gamma_S, gamma_A=gamma_A, num_flocks=num_flocks, num_species=num_species):
+    if symptomatic:
+        return current_val[:,:,3] * gamma_S
+    else:
+        return current_val[:,:,4] * gamma_A
     
 
 ######## Gillespie Algorithm ########
@@ -148,15 +149,12 @@ def Gillespie_simu(max_events=max_events, init_val=init_val, tot_popul=tot_popul
         ##### create an event tensor ####
 
         all_events = np.zeros((num_flocks, num_species, 6)) # six types of update rules in total
-        for i in range(num_flocks):
-            for j in range(num_species):
-                all_events[i, j, 0] = S_to_E(i, j, current_val, True)
-                all_events[i, j, 1] = S_to_E(i, j, current_val, False)
-                all_events[i, j, 2] = E_to_I(i, j, current_val, True)
-                all_events[i, j, 3] = E_to_I(i, j, current_val, False)
-                all_events[i, j, 4] = I_to_R(i, j, current_val, True)
-                all_events[i, j, 5] = I_to_R(i, j, current_val, False)
-
+        all_events[:,:,0] = S_to_E(current_val, True)
+        all_events[:,:,1] = S_to_E(current_val, False)
+        all_events[:,:,2] = E_to_I(current_val, True)
+        all_events[:,:,3] = E_to_I(current_val, False)
+        all_events[:,:,4] = I_to_R(current_val, True)   
+        all_events[:,:,5] = I_to_R(current_val, False)
 
         # store total rate to rescale later
         tot_rate = np.sum(all_events)
