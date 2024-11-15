@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=6
 #SBATCH --time=2-00:00:00
 #SBATCH --job-name=mass_simu
@@ -32,4 +32,6 @@ module load GCC/10.2.0 parallel/20210322 OpenMPI/4.0.5 scikit-learn/0.23.2
 # MY_EXEC='python ./Mass_simulation.py'
 # parallel $MY_PARALLEL_OPTS srun $MY_SRUN_OPTS $MY_EXEC ::: 0.2 0.3 0.4 0.5 0.6 0.7 0.8
 
-python Mass_simulation.py
+for pop in 300 600 900 1200 1500 1800 2100 2400 2700 3000 3300 3600 3900 4200 4500 4800; do
+    python Mass_simulation.py --tot_duck_popul $pop --vaccinated 0
+done

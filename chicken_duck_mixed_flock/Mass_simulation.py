@@ -1,8 +1,32 @@
 import numpy as np
 import pandas as pd
+import multiprocessing as mp
+import argparse
 
-num_simu = 10 # number of total simulations, smaller number for testing, larger number for data generation.
+num_simu = 10000 # number of total simulations, smaller number for testing, larger number for data generation.
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Set parameters for the simulation.")
+    
+    # Argument for total duck population
+    parser.add_argument('--tot_duck_popul', type=int, default=3000, help='Total duck population')
+    
+    # Argument for the number of vaccinated chickens
+    parser.add_argument('--vaccinated', type=int, default=0, help='Number of vaccinated chickens')
+    
+    return parser.parse_args()
+
+if __name__ == "__main__":
+    # Parse the arguments
+    args = parse_args()
+
+    # Use the parsed values for tot_duck_popul and vaccinated
+    tot_duck_popul = args.tot_duck_popul
+    vaccinated = args.vaccinated
+    
+    # Print values to check
+    print(f"Total Duck Population: {tot_duck_popul}")
+    print(f"Vaccinated Chickens: {vaccinated}")
 
 ######## Changable Values ########
 # set number of species and flocks
@@ -291,17 +315,36 @@ def random_sample_outcomes(t, y, surveillance=surveillance, testing_period=testi
     return detection_time
 
 ######## Collect all statistics for a number of simulations ########
-def mass_simu(num_simu, max_events=max_events, init_val=init_val, tot_popul=tot_popul, 
-              beta_S=beta_S, beta_A=beta_A, sigma_S=sigma_S, sigma_A=sigma_A,
-              gamma_S=gamma_S, gamma_A=gamma_A, p_S=p_S, p_A=p_A, num_flocks=num_flocks, 
-              num_species=num_species):
-    t_mass_simu = []
-    y_mass_simu = []
 
-    param = max_events, init_val, tot_popul, beta_S, beta_A, sigma_S, sigma_A, gamma_S, gamma_A, p_S, p_A, num_flocks, num_species
-    result = list(map(lambda p: Gillespie_simu(*p), [param]*num_simu))
+# Define the simulation function with randomness
+def run_simulation(params):
+    seed, other_params = params
+    np.random.seed(seed)  # Set a unique random seed for this process
+    # Unpack other parameters
+    t, y = Gillespie_simu(*other_params)
+    return t, y
 
-    t_mass_simu, y_mass_simu = zip(*result)
+# Function to prepare parameters with unique seeds
+def prepare_params_with_seeds(num_simu, max_events, init_val, tot_popul, beta_S, beta_A, sigma_S, sigma_A, gamma_S, gamma_A, p_S, p_A, num_flocks, num_species):
+    seeds = np.random.randint(0, 1e6, size=num_simu)  # Generate unique seeds
+    # Pair each seed with the parameters for a simulation
+    params = [
+        (seed, (max_events, init_val.copy(), tot_popul.copy(), beta_S, beta_A, sigma_S, sigma_A, gamma_S, gamma_A, p_S, p_A, num_flocks, num_species))
+        for seed in seeds
+    ]
+    return params
+
+# Main function for parallel execution with randomness
+def run_parallel_simulations_with_randomness(num_simu, max_events, init_val, tot_popul, beta_S, beta_A, sigma_S, sigma_A, gamma_S, gamma_A, p_S, p_A, num_flocks, num_species):
+    # Prepare parameters with seeds
+    params = prepare_params_with_seeds(num_simu, max_events, init_val, tot_popul, beta_S, beta_A, sigma_S, sigma_A, gamma_S, gamma_A, p_S, p_A, num_flocks, num_species)
+
+    # Use multiprocessing Pool
+    with mp.Pool(mp.cpu_count()) as pool:
+        results = pool.map(run_simulation, params)
+
+    # Collect results
+    t_mass_simu, y_mass_simu = zip(*results)
     return list(t_mass_simu), list(y_mass_simu)
 
 def mass_outbreak_statistics(t_mass_simu, y_mass_simu, outbreak_threshold=5):
@@ -346,7 +389,23 @@ def mass_random_sample_outcomes(t_mass_simu, y_mass_simu):
 
 
 ######## Run the simulation ########
-t_mass_simu, y_mass_simu = mass_simu(num_simu)
+# Run the simulations in parallel
+t_mass_simu, y_mass_simu = run_parallel_simulations_with_randomness(
+    num_simu=num_simu,
+    max_events=max_events,
+    init_val=init_val,
+    tot_popul=tot_popul,
+    beta_S=beta_S,
+    beta_A=beta_A,
+    sigma_S=sigma_S,
+    sigma_A=sigma_A,
+    gamma_S=gamma_S,
+    gamma_A=gamma_A,
+    p_S=p_S,
+    p_A=p_A,
+    num_flocks=num_flocks,
+    num_species=num_species
+)
 
 mass_outbreak, mass_outbreak_time, mass_outbreak_indiv, mass_outbreak_time_indiv = mass_outbreak_statistics(t_mass_simu, y_mass_simu)
 mass_peak_size_whole, mass_peak_time_whole, mass_peak_size_indiv, mass_peak_time_indiv = mass_peak_size(t_mass_simu, y_mass_simu)
@@ -373,6 +432,7 @@ df = pd.DataFrame({'Outbreak': mass_outbreak,
                    'Detection Time Sentinel': mass_detection_time_sentinel,
                    'Detection Time Random': mass_detection_time_random})
 
+df.to_csv('test_2.csv', index=False)
 
-df.to_csv(f'Results_vaccinated_{vaccinated}_ducks_{tot_duck_popul}_dssi_{different_species_symptomatic_infection_rate}_dsai_{different_species_asymptomatic_infection_rate}.csv', index=False)
+#df.to_csv(f'Results_vaccinated_{vaccinated}_ducks_{tot_duck_popul}_dssi_{different_species_symptomatic_infection_rate}_dsai_{different_species_asymptomatic_infection_rate}.csv', index=False)
 
