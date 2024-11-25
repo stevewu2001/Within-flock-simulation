@@ -9,10 +9,13 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Set parameters for the simulation.")
     
     # Argument for total duck population
-    parser.add_argument('--tot_duck_popul', type=int, default=3000, help='Total duck population')
+    parser.add_argument('--tot_duck_popul', type=int, default=3000, help='Total duck population') # <---- set total duck population (vary between [300, 1500, 3000, 5000])
     
     # Argument for the number of vaccinated chickens
-    parser.add_argument('--vaccinated', type=int, default=0, help='Number of vaccinated chickens')
+    parser.add_argument('--vaccinated_chicken', type=int, default=0, help='Number of vaccinated chickens') # <---- choose how many chickens to be vaccinated (vary between [0, 1500, 2250, 2700])
+
+    # Argument for the number of vaccinated ducks
+    parser.add_argument('--vaccinated_duck', type=int, default=0, help='Number of vaccinated ducks') # <---- choose how many ducks to be vaccinated
     
     return parser.parse_args()
 
@@ -22,20 +25,19 @@ if __name__ == "__main__":
 
     # Use the parsed values for tot_duck_popul and vaccinated
     tot_duck_popul = args.tot_duck_popul
-    vaccinated = args.vaccinated
+    vaccinated_chicken = args.vaccinated_chicken
+    vaccinated_duck = args.vaccinated_duck
     
     # Print values to check
     print(f"Total Duck Population: {tot_duck_popul}")
-    print(f"Vaccinated Chickens: {vaccinated}")
+    print(f"Vaccinated Chickens: {vaccinated_chicken}")
 
 ######## Changable Values ########
 # set number of species and flocks
 num_flocks = 1 # One single flock, need to reflect in beta, sigma, and gamma 
-num_species = 4 # chicken, sentinel chicken, vaccinated chicken, duck
+num_species = 5 # chicken, sentinel chicken, vaccinated chicken, duck, vaccinated duck
 
 tot_chicken_popul = 3000 # total chicken population
-tot_duck_popul = 3000 # <---- set total duck population (vary between [300, 1500, 3000, 5000])
-vaccinated = 0 # <---- choose how many chickens to be vaccinated (vary between [0, 1500, 2250, 2700])
 
 ######## Surveillance Strategy ########
 surveillance = 30 # how many chickens are sentinel birds / how many chickens to randomly sample
@@ -108,8 +110,10 @@ init_val[0,3,0] += tot_duck_popul # <---- set total duck population
 init_val[0,0,0] -= surveillance
 init_val[0,1,0] += surveillance # chicken under surveillance 
 
-init_val[0,0,0] -= vaccinated
-init_val[0,2,0] += vaccinated # vaccinated chicken
+init_val[0,0,0] -= vaccinated_chicken
+init_val[0,2,0] += vaccinated_chicken # vaccinated chicken
+init_val[0,3,0] -= vaccinated_duck
+init_val[0,4,0] += vaccinated_duck # vaccinated duck
 
 
 # store the total population for each flock and each species
@@ -326,7 +330,7 @@ def run_simulation(params):
 
 # Function to prepare parameters with unique seeds
 def prepare_params_with_seeds(num_simu, max_events, init_val, tot_popul, beta_S, beta_A, sigma_S, sigma_A, gamma_S, gamma_A, p_S, p_A, num_flocks, num_species):
-    seeds = np.random.randint(0, 1e6, size=num_simu)  # Generate unique seeds
+    seeds = np.random.randint(0, 1e8, size=num_simu)  # Generate unique seeds
     # Pair each seed with the parameters for a simulation
     params = [
         (seed, (max_events, init_val.copy(), tot_popul.copy(), beta_S, beta_A, sigma_S, sigma_A, gamma_S, gamma_A, p_S, p_A, num_flocks, num_species))
@@ -414,25 +418,45 @@ mass_detection_time_sentinel = mass_sentinel_outcomes(t_mass_simu, y_mass_simu)
 mass_detection_time_random = mass_random_sample_outcomes(t_mass_simu, y_mass_simu)
 
 ######## Create a csv file to store the results ########
-df = pd.DataFrame({'Outbreak': mass_outbreak,
-                   'Outbreak Time': mass_outbreak_time,
-                   'Outbreak Chicken': mass_outbreak_indiv[:, 0],
-                   'Outbreak Duck': mass_outbreak_indiv[:, 3], 
-                   'Outbreak Time Chicken': mass_outbreak_time_indiv[:, 0], 
-                   'Outbreak Time Duck': mass_outbreak_time_indiv[:, 3], 
-                   'Peak Size Whole': mass_peak_size_whole, 
-                   'Peak Time Whole': mass_peak_time_whole, 
-                   'Peak Size Chicken': np.sum(mass_peak_size_indiv[:, :3], axis=1), 
-                   'Peak Time Chicken': np.sum(mass_peak_time_indiv[:, :3], axis=1), 
-                   'Peak Size Duck': mass_peak_size_indiv[:, 3], 
-                   'Peak Time Duck': mass_peak_time_indiv[:, 3], 
-                   'Final Size Chicken': np.sum(mass_final_size[:, :3], axis=1), 
-                   'Final Size Duck': mass_final_size[:, 3], 
-                   'End Time': mass_end_time,
-                   'Detection Time Sentinel': mass_detection_time_sentinel,
-                   'Detection Time Random': mass_detection_time_random})
+df = pd.DataFrame({
+    'Total Duck Population': [tot_duck_popul] * num_simu,
+    'Vaccinated Chickens': [vaccinated_chicken] * num_simu,
+    'Vaccinated Ducks': [vaccinated_duck] * num_simu,
+    'Same Species Symptomatic Infection Rate': [same_species_symptomatic_infection_rate] * num_simu,
+    'Same Species Asymptomatic Infection Rate': [same_species_asymptomatic_infection_rate] * num_simu,
+    'Different Species Symptomatic Infection Rate': [different_species_symptomatic_infection_rate] * num_simu,
+    'Different Species Asymptomatic Infection Rate': [different_species_asymptomatic_infection_rate] * num_simu,
+    'Chicken Symptomatic Latency Period': [chicken_symptomatic_latency_period] * num_simu,
+    'Duck Symptomatic Latency Period': [duck_symptomatic_latency_period] * num_simu,
+    'Chicken Asymptomatic Latency Period': [chicken_asymptomatic_latency_period] * num_simu,
+    'Duck Asymptomatic Latency Period': [duck_asymptomatic_latency_period] * num_simu,
+    'Chicken Symptomatic Infectious Period': [chicken_symptomatic_infectious_period] * num_simu,
+    'Duck Symptomatic Infectious Period': [duck_symptomatic_infectious_period] * num_simu,
+    'Chicken Asymptomatic Infectious Period': [chicken_asymptomatic_infectious_period] * num_simu,
+    'Duck Asymptomatic Infectious Period': [duck_asymptomatic_infectious_period] * num_simu,
+    'Chicken Symptomatic Probability': [chicken_symptomatic_prob] * num_simu,
+    'Duck Symptomatic Probability': [duck_symptomatic_prob] * num_simu,
+    'Outbreak': mass_outbreak,
+    'Outbreak Time': mass_outbreak_time,
+    'Outbreak Chicken': mass_outbreak_indiv[:, 0],
+    'Outbreak Duck': mass_outbreak_indiv[:, 3], 
+    'Outbreak Time Chicken': mass_outbreak_time_indiv[:, 0], 
+    'Outbreak Time Duck': mass_outbreak_time_indiv[:, 3], 
+    'Peak Size Whole': mass_peak_size_whole, 
+    'Peak Time Whole': mass_peak_time_whole, 
+    'Peak Size Chicken': np.sum(mass_peak_size_indiv[:, :3], axis=1), 
+    'Peak Time Chicken': np.sum(mass_peak_time_indiv[:, :3], axis=1), 
+    'Peak Size Duck': mass_peak_size_indiv[:, 3], 
+    'Peak Time Duck': mass_peak_time_indiv[:, 3], 
+    'Final Size Chicken': np.sum(mass_final_size[:, :3], axis=1), 
+    'Final Size Duck': mass_final_size[:, 3], 
+    'End Time': mass_end_time,
+    'Detection Time Sentinel': mass_detection_time_sentinel,
+    'Detection Time Random': mass_detection_time_random
+})
 
-df.to_csv('test_2.csv', index=False)
+df.to_csv('test.csv', index=False)
 
-#df.to_csv(f'Results_vaccinated_{vaccinated}_ducks_{tot_duck_popul}_dssi_{different_species_symptomatic_infection_rate}_dsai_{different_species_asymptomatic_infection_rate}.csv', index=False)
+# df.to_csv(f'Results_vaccinated_{vaccinated_chicken}_ducks_{tot_duck_popul}_dssi_{different_species_symptomatic_infection_rate}_dsai_{different_species_asymptomatic_infection_rate}.csv', index=False)
 
+print("Simulation completed!")
