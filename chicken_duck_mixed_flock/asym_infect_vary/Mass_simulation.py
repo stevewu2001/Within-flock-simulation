@@ -17,7 +17,7 @@ def parse_args():
     # Argument for the number of vaccinated ducks
     parser.add_argument('--vaccinated_duck', type=int, default=0, help='Number of vaccinated ducks') # <---- choose how many ducks to be vaccinated
     
-    parser.add_argument('--asymptomatic_infectious_period', type=int, default=4.9, help='infectious period for asymptomatic bird')
+    parser.add_argument('--asymptomatic_infectious_period', type=float, default=4.9, help='infectious period for asymptomatic bird')
 
     return parser.parse_args()
 
@@ -461,6 +461,6 @@ df = pd.DataFrame({
 
 #df.to_csv('test.csv', index=False)
 
-df.to_csv(f'Results_vaccinated_chicken_{vaccinated_chicken}_totvac_{vaccinated_chicken+vaccinated_duck}_duckpop_{tot_duck_popul}.csv', index=False)
+df.to_csv(f'Results_vaccinated_chicken_{vaccinated_chicken}_asym_infect_{chicken_asymptomatic_infectious_period}.csv', index=False)
 
 print("Simulation completed!")

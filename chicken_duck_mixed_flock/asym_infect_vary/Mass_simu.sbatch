@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=6
 #SBATCH --time=2-00:00:00
-#SBATCH --job-name=regression-multi
-#SBATCH --output=regression-multi_%j.out
-#SBATCH --error=regression-multi_%j.err
+#SBATCH --job-name=mass_simu
+#SBATCH --output=mass_simu_%j.out
+#SBATCH --error=mass_simu_%j.err
 
 
 # Tell numpy, scipy etc. how many cpus are available
@@ -32,4 +32,8 @@ module load GCC/10.2.0 parallel/20210322 OpenMPI/4.0.5 scikit-learn/0.23.2
 # MY_EXEC='python ./Mass_simulation.py'
 # parallel $MY_PARALLEL_OPTS srun $MY_SRUN_OPTS $MY_EXEC ::: 0.2 0.3 0.4 0.5 0.6 0.7 0.8
 
-python chicken_duck_mixed_flock/Mass_simulation.py
+for asym_infect in 4.9 7 14 20; do
+    for vacc_chicken in 0 1500 2250 2700; do
+        python Mass_simulation.py --tot_duck_popul 3000 --vaccinated_chicken $vacc_chicken --asymptomatic_infectious_period $asym_infect
+    done
+done

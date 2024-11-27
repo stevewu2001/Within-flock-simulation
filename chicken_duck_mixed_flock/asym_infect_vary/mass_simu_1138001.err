@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "Mass_simulation.py", line 464, in <module>
+    df.to_csv(f'Results_vaccinated_chicken_{vaccinated_chicken}_asym_infect_{asymptomatic_infectious_period}.csv', index=False)
+NameError: name 'asymptomatic_infectious_period' is not defined
+slurmstepd: error: *** JOB 1138001 ON node144 CANCELLED AT 2024-11-27T15:38:39 ***
