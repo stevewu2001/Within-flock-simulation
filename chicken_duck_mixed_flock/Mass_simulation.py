@@ -12,13 +12,8 @@ def parse_args():
     parser.add_argument('--tot_duck_popul', type=int, default=3000, help='Total duck population') # <---- set total duck population (vary between [300, 1500, 3000, 5000])
     
     # Argument for the number of vaccinated chickens
-    parser.add_argument('--vaccinated_chicken', type=int, default=0, help='Number of vaccinated chickens') # <---- choose how many chickens to be vaccinated (vary between [0, 1500, 2250, 2700])
-
-    # Argument for the number of vaccinated ducks
-    parser.add_argument('--vaccinated_duck', type=int, default=0, help='Number of vaccinated ducks') # <---- choose how many ducks to be vaccinated
+    parser.add_argument('--vaccinated', type=int, default=0, help='Number of vaccinated chickens')
     
-    parser.add_argument('--asymptomatic_infectious_period', type=int, default=4.9, help='infectious period for asymptomatic bird')
-
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -27,16 +22,11 @@ if __name__ == "__main__":
 
     # Use the parsed values for tot_duck_popul and vaccinated
     tot_duck_popul = args.tot_duck_popul
-    vaccinated_chicken = args.vaccinated_chicken
-    vaccinated_duck = args.vaccinated_duck
-    chicken_asymptomatic_infectious_period = args.asymptomatic_infectious_period 
-    duck_asymptomatic_infectious_period = args.asymptomatic_infectious_period
+    vaccinated = args.vaccinated
     
     # Print values to check
     print(f"Total Duck Population: {tot_duck_popul}")
-    print(f"Vaccinated Chickens: {vaccinated_chicken}")
-    print(f"Vaccinated Ducks: {vaccinated_duck}")
-    print(f"Asympotatic Infectious Period: {duck_asymptomatic_infectious_period}")
+    print(f"Vaccinated Chickens: {vaccinated}")
 
 ######## Changable Values ########
 # set number of species and flocks
@@ -459,8 +449,8 @@ df = pd.DataFrame({
     'Detection Time Random': mass_detection_time_random
 })
 
-#df.to_csv('test.csv', index=False)
+df.to_csv('test_2.csv', index=False)
 
-df.to_csv(f'Results_vaccinated_chicken_{vaccinated_chicken}_totvac_{vaccinated_chicken+vaccinated_duck}_duckpop_{tot_duck_popul}.csv', index=False)
+#df.to_csv(f'Results_vaccinated_{vaccinated}_ducks_{tot_duck_popul}_dssi_{different_species_symptomatic_infection_rate}_dsai_{different_species_asymptomatic_infection_rate}.csv', index=False)
 
 print("Simulation completed!")
