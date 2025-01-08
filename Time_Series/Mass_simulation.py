@@ -3,7 +3,7 @@ import h5py
 import multiprocessing as mp
 import argparse
 
-num_simu = 10000 # number of total simulations, smaller number for testing, larger number for data generation.
+num_simu = 10 # number of total simulations, smaller number for testing, larger number for data generation.
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Set parameters for the simulation.")
@@ -301,4 +301,21 @@ simu_params = [{
 # File to save the simulations
 output_file = 'simulation_results.h5'
 
+with h5py.File(output_file, 'w') as f:
+    for i, params in enumerate(simu_params):
+        t, y = Gillespie_simu()
+        # Create a group for each simulation
+        sim_group = f.create_group(f"simulation_{i+1}")
 
+        # Store time and state data
+        sim_group.create_dataset("time", data=t)
+        sim_group.create_dataset("state", data=y)
+
+        param_group = sim_group.create_group("parameters")
+        for key, value in params.items():
+            if isinstance(value, np.ndarray):
+                param_group.create_dataset(key, data=value)
+            else:
+                param_group.attrs[key] = value  # Store scalars/strings as attributes
+
+print('simulation completed!')
