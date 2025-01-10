@@ -3,7 +3,7 @@ import h5py
 import multiprocessing as mp
 import argparse
 
-num_simu = 10 # number of total simulations, smaller number for testing, larger number for data generation.
+num_simu = 1000 # number of total simulations, smaller number for testing, larger number for data generation.
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Set parameters for the simulation.")
@@ -273,7 +273,7 @@ def Gillespie_simu(max_events=max_events, init_val=init_val):
     return t, y # y format: [time, flock, species, compartment]
 
 
-simu_params = [{
+simu_params = {
 'num_simu': num_simu,
 'num_flocks': num_flocks,
 'num_species': num_types,
@@ -296,13 +296,24 @@ simu_params = [{
 'duck_asymptomatic_infectious_period': duck_asymptomatic_infectious_period,
 'chicken_symptomatic_prob': chicken_symptomatic_prob,
 'duck_symptomatic_prob': duck_symptomatic_prob,
-'farm_areas': farm_areas} for _ in range(num_simu)]
-
+'farm_area': farm_area}
 # File to save the simulations
-output_file = 'simulation_results.h5'
+output_file = f'result_duckpop_{tot_duck_popul}_chickenvacc_{vaccinated}.h5'
 
 with h5py.File(output_file, 'w') as f:
-    for i, params in enumerate(simu_params):
+    param_group = f.create_group("parameters")
+
+    # Save parameters as datasets (more robust than attributes)
+    for key, value in simu_params.items():
+        if isinstance(value, np.ndarray):
+            param_group.create_dataset(key, data=value)  # Save numpy arrays as datasets
+        else:
+            # Convert scalars to a numpy array for consistent handling
+            param_group.create_dataset(key, data=np.array([value]))
+            print(f"Saved parameter: {key} = {value}")
+            
+    # Store simulation results
+    for i in range(num_simu):  # Iterate through the number of simulations
         t, y = Gillespie_simu()
         # Create a group for each simulation
         sim_group = f.create_group(f"simulation_{i+1}")
@@ -310,12 +321,5 @@ with h5py.File(output_file, 'w') as f:
         # Store time and state data
         sim_group.create_dataset("time", data=t)
         sim_group.create_dataset("state", data=y)
-
-        param_group = sim_group.create_group("parameters")
-        for key, value in params.items():
-            if isinstance(value, np.ndarray):
-                param_group.create_dataset(key, data=value)
-            else:
-                param_group.attrs[key] = value  # Store scalars/strings as attributes
 
 print('simulation completed!')
