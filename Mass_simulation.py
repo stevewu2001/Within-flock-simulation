@@ -61,7 +61,7 @@ duck_latency_period = 0.12
 symptomatic_duck_infectious_period = 4.7
 
 # duck_symptomatic_probability = 0.05 # <---- sensitvity needed
-symptomatic_duck_case_fatality_probability = 0.5 # <---- sensitivity needed
+symptomatic_duck_case_fatality_probability = 0.7 # <---- sensitivity needed
 
 asymptomatic_duck_to_duck_transmission_rate = \
         1/rescale_factor * symptomatic_duck_to_duck_transmission_rate # <---- sensitvity needed
@@ -207,7 +207,7 @@ def Gillespie_simu(init_val, max_events=max_events):
     current_val = init_val.copy()
 
     # set the time and state sequence
-    t = [0] + [None] * max_events
+    t = [np.random.uniform()] + [None] * max_events
     y = [init_val] + [None] * max_events
 
 
