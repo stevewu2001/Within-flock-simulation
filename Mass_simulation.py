@@ -11,10 +11,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Set parameters for the simulation.")
     
     # Argument for total duck population
-    parser.add_argument('--tot_chicken_popul', type=int, default=200, help='Total chicken population, from 0 to 200')
+    parser.add_argument('--tot_chicken_popul', type=int, default=40, help='Total chicken population, from 0 to 200')
     
     # Argument for the number of vaccinated chickens
-    parser.add_argument('--duck_sym_prob', type=float, default=0.05, help='Probability of a duck being symptomatic, from 0 to 1')
+    parser.add_argument('--duck_sym_prob', type=float, default=0.0, help='Probability of a duck being symptomatic, from 0 to 1')
     
     # Argument for asymptomatic duck transmission rate / infectious period scaling factor
     parser.add_argument('--asym_duck_param_rescale', type=float, default=3.0, help='Asymptomatic duck transmission rate / infectious period scaling factor')
@@ -40,7 +40,7 @@ if __name__ == "__main__":
 num_flocks = 1 # One single flock, need to reflect in parameter matrices 
 num_species = 4 # chicken, duck, vaccinated chicken, vaccinated duck
 
-tot_no_bird = 200 # total number of birds in a flock
+tot_no_bird = 40 # total number of birds in a flock
 
 # tot_chicken_popul = 100  # total chicken population
 tot_duck_popul = tot_no_bird - tot_chicken_popul # total duck population
@@ -143,7 +143,7 @@ max_events = 50000
 def set_init_val(set_popul):
     init_val = set_popul.copy()
     init_infect = np.random.randint(1, tot_no_bird+1)
-    init_infect_is_duck = int(init_infect <= tot_chicken_popul) # 1 if a duck is initially infected
+    init_infect_is_duck = int(init_infect > tot_chicken_popul) # 1 if a duck is initially infected
     init_infect_is_asym = int(np.random.uniform() < q[init_infect_is_duck]) # 1 if inital infection is asymptomatic
 
     init_val[0,init_infect_is_duck,0] -= 1
@@ -207,7 +207,7 @@ def Gillespie_simu(init_val, max_events=max_events):
     current_val = init_val.copy()
 
     # set the time and state sequence
-    t = [np.random.uniform()] + [None] * max_events
+    t = [0] + [None] * max_events
     y = [init_val] + [None] * max_events
 
 
