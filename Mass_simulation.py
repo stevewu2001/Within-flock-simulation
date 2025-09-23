@@ -2,19 +2,20 @@ import numpy as np
 import h5py
 import multiprocessing as mp
 import argparse
-import random
+import os
 from tqdm import tqdm
 
-num_simu = 5000  # number of total simulations
+num_simu = 5000  # number of total simulations, adjust as needed
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Set parameters for the simulation.")
     parser.add_argument('--tot_chicken_popul', type=int, default=40, help='Total chicken population do not exceed total num of birds')
     parser.add_argument('--duck_sym_prob', type=float, default=0.0, help='Probability of a duck being symptomatic, from 0 to 1')
-    parser.add_argument('--asym_duck_param_rescale', type=float, default=3.0, help='Asymptomatic duck transmission rate / infectious period scaling factor')
     parser.add_argument('--tot_no_bird', type=int, default=40, help='Total number of birds in a flock')
     parser.add_argument('--random_parameter_toggle', type=int, default=0, help='Whether to randomly sample parameters from distributions, choose 0 or 1')
+    parser.add_argument('--row_index', type=int, default=0, help='Row index for parameter grid if random_parameter_toggle is 1')
     parser.add_argument('--frequency_dependent_toggle', type=int, default=0, help='Whether to use frequency-dependent transmission (1) or density-dependent (0)')
+    parser.add_argument('--seed', type=int, default=36750, help='Random seed for reproducibility')
     return parser.parse_args()
 
 # ---- constants that do NOT depend on args ----
@@ -29,12 +30,15 @@ def S_to_E(current_val):
     I_asym = current_val[:,:,4].copy()
 
     if frequency_dependent_toggle == 1:
-        idx = np.arange(num_flocks)
         tot_alive_birds = np.sum(current_val[:,:,:-1])
-        beta[idx,:,idx,:] /= tot_alive_birds - 1 
-        beta_asym[idx,:,idx,:] /= tot_alive_birds - 1 
+        denom = max(tot_alive_birds - 1, 1)  # avoid division by zero
+        beta_eff = beta / denom
+        beta_asym_eff = beta_asym / denom
+    else:
+        beta_eff = beta
+        beta_asym_eff = beta_asym
 
-    FoI = np.einsum('ijab,ij->ab', beta, I) + np.einsum('ijab,ij->ab', beta_asym, I_asym)
+    FoI = np.einsum('ijab,ij->ab', beta_eff, I) + np.einsum('ijab,ij->ab', beta_asym_eff, I_asym)
     weight = np.einsum('ab,ab->ab', FoI, S)
     weight_sym = np.einsum('ab,b->ab', weight, p)
     weight_asym = np.einsum('ab,b->ab', weight, q)
@@ -139,9 +143,8 @@ def set_init_val(set_popul):
 def init_worker(params):
     globals().update(params)
 
-def run_simulation(sim_id):
-    seed = random.SystemRandom().randint(0, 2**32-1)
-    np.random.seed(seed)
+def run_simulation(sim_id, base_seed):
+    np.random.seed(base_seed + sim_id)  # deterministic per simulation
     t, y = Gillespie_simu(set_init_val(set_popul))
     return sim_id, t, y
 
@@ -152,16 +155,18 @@ if __name__ == "__main__":
     # Build all parameters (exact same logic as in original code) and collect them into a dict
     tot_chicken_popul = args.tot_chicken_popul
     duck_symptomatic_probability = args.duck_sym_prob
-    rescale_factor = args.asym_duck_param_rescale
     tot_no_bird = args.tot_no_bird
     random_parameter_toggle = args.random_parameter_toggle
+    row_index = args.row_index
     frequency_dependent_toggle = args.frequency_dependent_toggle
+    seed = args.seed
 
 
     print(f"Total Number of Birds in a Flock: {tot_no_bird}")
     print(f"Total Chicken Population: {tot_chicken_popul}")
     print(f"Duck Symptomatic Probability: {duck_symptomatic_probability}")
-    print(f"Asymptomatic Duck Rescale Factor: {rescale_factor}")
+
+    np.random.seed(seed)
 
     tot_duck_popul = tot_no_bird - tot_chicken_popul
 
@@ -176,16 +181,21 @@ if __name__ == "__main__":
         symptomatic_duck_infectious_period = 4.7
         symptomatic_duck_case_fatality_probability = 0.7
 
+        rescale_factor = 3.0
+
     else:
 
-        chicken_to_chicken_transmission_rate = np.random.uniform(1.02, 1.30)
-        chicken_latency_period = np.random.uniform(0.0099, 0.48)
-        chicken_infectious_period = np.random.uniform(1.8, 2.3)
+        param_grid = np.load("param_grid.npy")
+        chicken_to_chicken_transmission_rate = param_grid[row_index, 0]
+        chicken_latency_period = param_grid[row_index, 1]
+        chicken_infectious_period = param_grid[row_index, 2]
 
-        symptomatic_duck_to_duck_transmission_rate = np.random.uniform(2.8, 5.8)
-        duck_latency_period = np.random.uniform(0.03, 0.38)
-        symptomatic_duck_infectious_period = np.random.uniform(2.8, 5.7)
-        symptomatic_duck_case_fatality_probability = np.random.uniform(0.61, 0.78)
+        symptomatic_duck_to_duck_transmission_rate = param_grid[row_index, 3]
+        duck_latency_period = param_grid[row_index, 4]
+        symptomatic_duck_infectious_period = param_grid[row_index, 5]
+        symptomatic_duck_case_fatality_probability = param_grid[row_index, 6]
+
+        rescale_factor = param_grid[row_index, 7]
 
     chicken_symptomatic_probability = 1
     chicken_case_fatality_probability = 1
@@ -255,22 +265,26 @@ if __name__ == "__main__":
         'delta_asym_comp': delta_asym_comp,
         'tot_no_bird': tot_no_bird,
         'tot_chicken_popul': tot_chicken_popul,
-        # also include small scalars if needed
+        'random_parameter_toggle': random_parameter_toggle,
+        'frequency_dependent_toggle': frequency_dependent_toggle,
     }
 
-    output_file = f'chicken_{tot_chicken_popul}_symprob_{duck_symptomatic_probability}_rescale_{rescale_factor}_totpop_{tot_no_bird}_toggle_{random_parameter_toggle}.h5'
+    output_file = f'Raw_simu_files/chicken_{tot_chicken_popul}_symprob_{duck_symptomatic_probability}_totpop_{tot_no_bird}_rand_{random_parameter_toggle}_index_{row_index}_freq_{frequency_dependent_toggle}.h5'
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
     # Use Pool with initializer so worker processes receive parameter globals
     num_workers = min(mp.cpu_count(), num_simu)
 
     with mp.Pool(num_workers, initializer=init_worker, initargs=(params,)) as pool:
-        results = list(tqdm(pool.imap(run_simulation, range(num_simu)), total=num_simu, desc="Running Simulations"))
-
+        results = list(tqdm(
+            pool.starmap(run_simulation, [(i, seed) for i in range(num_simu)]),
+            total=num_simu,
+            desc="Running Simulations"
+        ))
     # Save results
     with h5py.File(output_file, 'w') as f:
         f.attrs['total_chicken_population'] = tot_chicken_popul
         f.attrs['duck_symptomatic_probability'] = duck_symptomatic_probability
-        f.attrs['rescale_factor'] = rescale_factor
         f.attrs['num_simulations'] = num_simu
         for sim_id, t, y in results:
             sim_group = f.create_group(f"simulation_{sim_id+1}")
